@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 
 	_ "github.com/ClickHouse/clickhouse-go/v2"
 )
@@ -17,13 +18,14 @@ func main() {
 		database = "default"
 	)
 
-	// Establish a connection to the database
-	connStr := fmt.Sprintf("%s/%s?username=%s&password=%s", address, database, username, password)
-	db, err := sql.Open("clickhouse", connStr)
-	if err != nil {
-		log.Fatalf("Failed to create connection pool: %v", err)
-	}
+	clickhouseDSN := os.Args[1]
 
+	// Establish a connection to the database
+	// connStr := fmt.Sprintf("%s/%s?username=%s&password=%s", address, database, username, password)
+	db, err := sql.Open("clickhouse", clickhouseDSN)
+	if err != nil {
+		log.Fatalf("Failed to open database: %v", err)
+	}
 	// Ping the database to ensure connection is established
 	if err := db.Ping(); err != nil {
 		log.Fatalf("Failed to connect: %v", err)
