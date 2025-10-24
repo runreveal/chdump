@@ -1,40 +1,58 @@
 package main
 
 import (
-	"database/sql"
+	"crypto/tls"
 	"fmt"
 	"log"
 	"os"
+	"time"
 
-	_ "github.com/ClickHouse/clickhouse-go/v2"
+	"github.com/ClickHouse/clickhouse-go/v2"
 )
 
 func main() {
-	// Replace these with your actual database credentials and connection details
-	const (
-		address  = "tcp://localhost:9000"
-		username = "default"
-		password = ""
-		database = "default"
-	)
+	database := os.Args[1]
+	username := os.Args[2]
+	password := os.Args[3]
 
-	clickhouseDSN := os.Args[1]
-
-	// Establish a connection to the database
-	// connStr := fmt.Sprintf("%s/%s?username=%s&password=%s", address, database, username, password)
-	db, err := sql.Open("clickhouse", clickhouseDSN)
-	if err != nil {
-		log.Fatalf("Failed to open database: %v", err)
-	}
+	conn := clickhouse.OpenDB(&clickhouse.Options{
+		Addr: []string{"127.0.0.1:9999"},
+		Auth: clickhouse.Auth{
+			Database: database,
+			Username: username,
+			Password: password,
+		},
+		TLS: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+		Settings: clickhouse.Settings{
+			"max_execution_time": 60,
+		},
+		DialTimeout: time.Second * 30,
+		Compression: &clickhouse.Compression{
+			Method: clickhouse.CompressionLZ4,
+		},
+		Debug:                true,
+		BlockBufferSize:      10,
+		MaxCompressionBuffer: 10240,
+		ClientInfo: clickhouse.ClientInfo{ // optional, please see Client info section in the README.md
+			Products: []struct {
+				Name    string
+				Version string
+			}{
+				{Name: "my-app", Version: "0.1"},
+			},
+		},
+	})
 	// Ping the database to ensure connection is established
-	if err := db.Ping(); err != nil {
+	if err := conn.Ping(); err != nil {
 		log.Fatalf("Failed to connect: %v", err)
 	}
-	defer db.Close()
+	defer conn.Close()
 
 	// Query to retrieve table names in the specified database
 	tableNamesQuery := "SHOW TABLES"
-	rows, err := db.Query(tableNamesQuery)
+	rows, err := conn.Query(tableNamesQuery)
 	if err != nil {
 		log.Fatalf("Failed to execute query: %v", err)
 	}
@@ -47,7 +65,7 @@ func main() {
 		}
 		// Query to retrieve the DDL of each table
 		showCreateTableQuery := fmt.Sprintf("SHOW CREATE TABLE `%s`", tableName)
-		tableDDL, err := db.Query(showCreateTableQuery)
+		tableDDL, err := conn.Query(showCreateTableQuery)
 		if err != nil {
 			log.Fatalf("Failed to get DDL for table %s: %v", tableName, err)
 		}
